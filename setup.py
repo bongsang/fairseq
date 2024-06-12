@@ -6,6 +6,7 @@
 
 import os
 import subprocess
+import shutil
 import sys
 
 from setuptools import Extension, find_packages, setup
@@ -239,11 +240,19 @@ def get_files(path, relative_to="fairseq"):
 
 
 if __name__ == "__main__":
+    fairseq_examples = os.path.join("fairseq", "examples")
+    source_examples = os.path.join("..", "examples")
     try:
-        # symlink examples into fairseq package so package_data accepts them
-        fairseq_examples = os.path.join("fairseq", "examples")
-        if "build_ext" not in sys.argv[1:] and not os.path.exists(fairseq_examples):
-            os.symlink(os.path.join("..", "examples"), fairseq_examples)
+        if "build_ext" not in sys.argv[1:]:
+            if not os.path.exists(fairseq_examples):
+                # Check if the target is a symlink and remove it if it is
+                if os.path.islink(fairseq_examples):
+                    os.unlink(fairseq_examples)
+                # If the target directory exists and is not a symlink, it's assumed to be an actual directory and is removed
+                elif os.path.isdir(fairseq_examples):
+                    shutil.rmtree(fairseq_examples)
+                # Copy the examples directory instead of creating a symlink
+                shutil.copytree(source_examples, fairseq_examples)
 
         package_data = {
             "fairseq": (
@@ -253,5 +262,6 @@ if __name__ == "__main__":
         }
         do_setup(package_data)
     finally:
-        if "build_ext" not in sys.argv[1:] and os.path.islink(fairseq_examples):
-            os.unlink(fairseq_examples)
+        # Remove the copied examples directory after setup to clean up
+        if "build_ext" not in sys.argv[1:] and os.path.isdir(fairseq_examples):
+            shutil.rmtree(fairseq_examples)
